@@ -38,7 +38,6 @@
 #define TAG_DTLS_ALERT "DTLS_ALERT"
 #define TAG_DTLS_HANG "DTLS_HANG"
 #define TAG_RESOURCE_UNSUB "RESOURCE_UNSUB"
-#define TAG_LARGE_TIMER "LARGE_TIMER"
 
 // Use memory/disk cache and donot flush when write log.
 // it's ok to use it without config, which will log to console, and default trace level.

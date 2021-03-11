@@ -325,8 +325,6 @@ SrsHttpMessage::SrsHttpMessage(ISrsReader* reader, SrsFastStream* buffer) : ISrs
     // From HTTP/1.1, default to keep alive.
     _keep_alive = true;
     type_ = 0;
-
-    schema_ = "http";
 }
 
 SrsHttpMessage::~SrsHttpMessage()
@@ -418,8 +416,7 @@ srs_error_t SrsHttpMessage::set_url(string url, bool allow_jsonp)
 
 void SrsHttpMessage::set_https(bool v)
 {
-    schema_ = v? "https" : "http";
-    _uri->set_schema(schema_);
+    _uri->set_schema(v? "https" : "http");
 }
 
 ISrsConnection* SrsHttpMessage::connection()
@@ -430,11 +427,6 @@ ISrsConnection* SrsHttpMessage::connection()
 void SrsHttpMessage::set_connection(ISrsConnection* conn)
 {
     owner_conn = conn;
-}
-
-string SrsHttpMessage::schema()
-{
-    return schema_;
 }
 
 uint8_t SrsHttpMessage::method()

@@ -171,7 +171,6 @@ static SrsStageManager* _srs_stages = new SrsStageManager();
 SrsPithyPrint::SrsPithyPrint(int _stage_id)
 {
     stage_id = _stage_id;
-    cache_ = NULL;
     client_id = enter_stage();
     previous_tick = srs_get_system_time();
     _age = 0;
@@ -309,10 +308,7 @@ void SrsPithyPrint::leave_stage()
 
 void SrsPithyPrint::elapse()
 {
-    SrsStageInfo* stage = cache_;
-    if (!stage) {
-        stage = cache_ = _srs_stages->fetch_or_create(stage_id);
-    }
+    SrsStageInfo* stage = _srs_stages->fetch_or_create(stage_id);
     srs_assert(stage != NULL);
     
     srs_utime_t diff = srs_get_system_time() - previous_tick;
@@ -325,10 +321,7 @@ void SrsPithyPrint::elapse()
 
 bool SrsPithyPrint::can_print()
 {
-    SrsStageInfo* stage = cache_;
-    if (!stage) {
-        stage = cache_ = _srs_stages->fetch_or_create(stage_id);
-    }
+    SrsStageInfo* stage = _srs_stages->fetch_or_create(stage_id);
     srs_assert(stage != NULL);
     
     return stage->can_print();

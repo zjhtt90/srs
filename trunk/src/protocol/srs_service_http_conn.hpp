@@ -120,7 +120,6 @@ private:
     // Whether the body is chunked.
     bool chunked;
 private:
-    std::string schema_;
     // The parsed url.
     std::string _url;
     // The extension of file, for example, .flv
@@ -153,8 +152,6 @@ public:
     virtual ISrsConnection* connection();
     virtual void set_connection(ISrsConnection* conn);
 public:
-    // The schema, http or https.
-    virtual std::string schema();
     virtual uint8_t method();
     virtual uint16_t status_code();
     // The method helpers.

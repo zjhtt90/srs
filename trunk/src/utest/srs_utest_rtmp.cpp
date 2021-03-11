@@ -3139,7 +3139,7 @@ VOID TEST(ProtocolRTMPTest, MergeReadHandler)
 
 char* _strcpy(const char* src)
 {
-    return strcpy(new char[strlen(src) + 1], src);
+    return strcpy(new char[strlen(src)], src);
 }
 
 VOID TEST(ProtocolRTMPTest, CreateRTMPMessage)

@@ -45,36 +45,6 @@ using namespace std;
 #include <srs_app_rtc_api.hpp>
 #include <srs_protocol_utility.hpp>
 
-extern SrsPps* _srs_pps_rpkts;
-SrsPps* _srs_pps_rstuns = new SrsPps();
-SrsPps* _srs_pps_rrtps = new SrsPps();
-SrsPps* _srs_pps_rrtcps = new SrsPps();
-extern SrsPps* _srs_pps_addrs;
-extern SrsPps* _srs_pps_fast_addrs;
-
-extern SrsPps* _srs_pps_spkts;
-extern SrsPps* _srs_pps_sstuns;
-extern SrsPps* _srs_pps_srtcps;
-extern SrsPps* _srs_pps_srtps;
-
-extern SrsPps* _srs_pps_ids;
-extern SrsPps* _srs_pps_fids;
-extern SrsPps* _srs_pps_fids_level0;
-
-extern SrsPps* _srs_pps_pli;
-extern SrsPps* _srs_pps_twcc;
-extern SrsPps* _srs_pps_rr;
-
-extern SrsPps* _srs_pps_snack;
-extern SrsPps* _srs_pps_snack2;
-extern SrsPps* _srs_pps_sanack;
-extern SrsPps* _srs_pps_svnack;
-
-extern SrsPps* _srs_pps_rnack;
-extern SrsPps* _srs_pps_rnack2;
-extern SrsPps* _srs_pps_rhnack;
-extern SrsPps* _srs_pps_rmnack;
-
 SrsRtcBlackhole::SrsRtcBlackhole()
 {
     blackhole = false;
@@ -247,15 +217,11 @@ SrsRtcServer::SrsRtcServer()
 {
     handler = NULL;
     hijacker = NULL;
-    timer = new SrsHourGlass("server", this, 1 * SRS_UTIME_SECONDS);
-
-    _srs_config->subscribe(this);
+    timer = new SrsHourGlass(this, 1 * SRS_UTIME_SECONDS);
 }
 
 SrsRtcServer::~SrsRtcServer()
 {
-    _srs_config->unsubscribe(this);
-
     srs_freep(timer);
 
     if (true) {
@@ -283,62 +249,9 @@ srs_error_t SrsRtcServer::initialize()
         return srs_error_wrap(err, "black hole");
     }
 
-    bool rtp_cache_enabled = _srs_config->get_rtc_server_rtp_cache_enabled();
-    uint64_t rtp_cache_pkt_size = _srs_config->get_rtc_server_rtp_cache_pkt_size();
-    uint64_t rtp_cache_payload_size = _srs_config->get_rtc_server_rtp_cache_payload_size();
-    _srs_rtp_cache->setup(rtp_cache_enabled, rtp_cache_pkt_size);
-    _srs_rtp_raw_cache->setup(rtp_cache_enabled, rtp_cache_payload_size);
-    _srs_rtp_fua_cache->setup(rtp_cache_enabled, rtp_cache_payload_size);
-
-    bool rtp_msg_cache_enabled = _srs_config->get_rtc_server_rtp_msg_cache_enabled();
-    uint64_t rtp_msg_cache_msg_size = _srs_config->get_rtc_server_rtp_msg_cache_msg_size();
-    uint64_t rtp_msg_cache_buffer_size = _srs_config->get_rtc_server_rtp_msg_cache_buffer_size();
-    _srs_rtp_msg_cache_buffers->setup(rtp_msg_cache_enabled, rtp_msg_cache_buffer_size);
-    _srs_rtp_msg_cache_objs->setup(rtp_msg_cache_enabled, rtp_msg_cache_msg_size);
-
-    srs_trace("RTC: Object cache init, rtp-cache=(enabled:%d,pkt:%dm-%dw,payload:%dm-%dw-%dw), msg-cache=(enabled:%d,obj:%dm-%dw,buf:%dm-%dw)",
-        rtp_cache_enabled, (int)(rtp_cache_pkt_size/1024/1024), _srs_rtp_cache->capacity()/10000,
-        (int)(rtp_cache_payload_size/1024/1024), _srs_rtp_raw_cache->capacity()/10000, _srs_rtp_fua_cache->capacity()/10000,
-        rtp_msg_cache_enabled, (int)(rtp_msg_cache_msg_size/1024/1024), _srs_rtp_msg_cache_objs->capacity()/10000,
-        (int)(rtp_msg_cache_buffer_size/1024/1024), _srs_rtp_msg_cache_buffers->capacity()/10000);
+    srs_trace("RTC server init ok");
 
     return err;
-}
-
-srs_error_t SrsRtcServer::on_reload_rtc_server()
-{
-    bool changed = false;
-
-    bool rtp_cache_enabled = _srs_config->get_rtc_server_rtp_cache_enabled();
-    uint64_t rtp_cache_pkt_size = _srs_config->get_rtc_server_rtp_cache_pkt_size();
-    uint64_t rtp_cache_payload_size = _srs_config->get_rtc_server_rtp_cache_payload_size();
-    if (_srs_rtp_cache->enabled() != rtp_cache_enabled) {
-        _srs_rtp_cache->setup(rtp_cache_enabled, rtp_cache_pkt_size);
-        _srs_rtp_raw_cache->setup(rtp_cache_enabled, rtp_cache_payload_size);
-        _srs_rtp_fua_cache->setup(rtp_cache_enabled, rtp_cache_payload_size);
-
-        changed = true;
-    }
-
-    bool rtp_msg_cache_enabled = _srs_config->get_rtc_server_rtp_msg_cache_enabled();
-    uint64_t rtp_msg_cache_msg_size = _srs_config->get_rtc_server_rtp_msg_cache_msg_size();
-    uint64_t rtp_msg_cache_buffer_size = _srs_config->get_rtc_server_rtp_msg_cache_buffer_size();
-    if (_srs_rtp_msg_cache_buffers->enabled() != rtp_msg_cache_enabled) {
-        _srs_rtp_msg_cache_buffers->setup(rtp_msg_cache_enabled, rtp_msg_cache_buffer_size);
-        _srs_rtp_msg_cache_objs->setup(rtp_msg_cache_enabled, rtp_msg_cache_msg_size);
-
-        changed = true;
-    }
-
-    if (changed) {
-        srs_trace("RTC: Object cache reload, rtp-cache=(enabled:%d,pkt:%dm-%dw,payload:%dm-%dw-%dw), msg-cache=(enabled:%d,obj:%dm-%dw,buf:%dm-%dw)",
-            rtp_cache_enabled, (int)(rtp_cache_pkt_size/1024/1024), _srs_rtp_cache->capacity()/10000,
-            (int)(rtp_cache_payload_size/1024/1024), _srs_rtp_raw_cache->capacity()/10000, _srs_rtp_fua_cache->capacity()/10000,
-            rtp_msg_cache_enabled, (int)(rtp_msg_cache_msg_size/1024/1024), _srs_rtp_msg_cache_objs->capacity()/10000,
-            (int)(rtp_msg_cache_buffer_size/1024/1024), _srs_rtp_msg_cache_buffers->capacity()/10000);
-    }
-
-    return srs_success;
 }
 
 void SrsRtcServer::set_handler(ISrsRtcServerHandler* h)
@@ -387,32 +300,27 @@ srs_error_t SrsRtcServer::on_udp_packet(SrsUdpMuxSocket* skt)
 {
     srs_error_t err = srs_success;
 
-    SrsRtcConnection* session = NULL;
+    string peer_id = skt->peer_id();
     char* data = skt->data(); int size = skt->size();
-    bool is_rtp_or_rtcp = srs_is_rtp_or_rtcp((uint8_t*)data, size);
-    bool is_rtcp = srs_is_rtcp((uint8_t*)data, size);
 
-    uint64_t fast_id = skt->fast_id();
-    // Try fast id first, if not found, search by long peer id.
-    if (fast_id) {
-        session = (SrsRtcConnection*)_srs_rtc_manager->find_by_fast_id(fast_id);
-    }
-    if (!session) {
-        string peer_id = skt->peer_id();
-        session = (SrsRtcConnection*)_srs_rtc_manager->find_by_id(peer_id);
+    SrsRtcConnection* session = NULL;
+    if (true) {
+        ISrsResource* conn = _srs_rtc_manager->find_by_id(peer_id);
+        if (conn) {
+            // Switch to the session to write logs to the context.
+            session = dynamic_cast<SrsRtcConnection*>(conn);
+            session->switch_to_context();
+        }
     }
 
+    // When got any packet, the session is alive now.
     if (session) {
-        // When got any packet, the session is alive now.
         session->alive();
     }
 
     // Notify hijack to handle the UDP packet.
-    if (hijacker && is_rtp_or_rtcp && is_rtcp) {
+    if (hijacker) {
         bool consumed = false;
-        if (session) {
-            session->switch_to_context();
-        }
         if ((err = hijacker->on_udp_packet(skt, session, &consumed)) != srs_success) {
             return srs_error_wrap(err, "hijack consumed=%u", consumed);
         }
@@ -423,28 +331,27 @@ srs_error_t SrsRtcServer::on_udp_packet(SrsUdpMuxSocket* skt)
     }
 
     // For STUN, the peer address may change.
-    if (!is_rtp_or_rtcp && srs_is_stun((uint8_t*)data, size)) {
-        ++_srs_pps_rstuns->sugar;
-        string peer_id = skt->peer_id();
-
+    if (srs_is_stun((uint8_t*)data, size)) {
         SrsStunPacket ping;
         if ((err = ping.decode(data, size)) != srs_success) {
             return srs_error_wrap(err, "decode stun packet failed");
         }
+        srs_info("recv stun packet from %s, use-candidate=%d, ice-controlled=%d, ice-controlling=%d",
+            peer_id.c_str(), ping.get_use_candidate(), ping.get_ice_controlled(), ping.get_ice_controlling());
+
         if (!session) {
             session = find_session_by_username(ping.get_username());
-        }
-        if (session) {
-            session->switch_to_context();
-        }
 
-        srs_info("recv stun packet from %s, fast=%" PRId64 ", use-candidate=%d, ice-controlled=%d, ice-controlling=%d",
-            peer_id.c_str(), fast_id, ping.get_use_candidate(), ping.get_ice_controlled(), ping.get_ice_controlling());
+            // Switch to the session to write logs to the context.
+            if (session) {
+                session->switch_to_context();
+            }
+        }
 
         // TODO: FIXME: For ICE trickle, we may get STUN packets before SDP answer, so maybe should response it.
         if (!session) {
-            return srs_error_new(ERROR_RTC_STUN, "no session, stun username=%s, peer_id=%s, fast=%" PRId64,
-                ping.get_username().c_str(), peer_id.c_str(), fast_id);
+            return srs_error_new(ERROR_RTC_STUN, "no session, stun username=%s, peer_id=%s",
+                ping.get_username().c_str(), peer_id.c_str());
         }
 
         return session->on_stun(skt, &ping);
@@ -452,32 +359,18 @@ srs_error_t SrsRtcServer::on_udp_packet(SrsUdpMuxSocket* skt)
 
     // For DTLS, RTCP or RTP, which does not support peer address changing.
     if (!session) {
-        string peer_id = skt->peer_id();
-        return srs_error_new(ERROR_RTC_STUN, "no session, peer_id=%s, fast=%" PRId64, peer_id.c_str(), fast_id);
+        return srs_error_new(ERROR_RTC_STUN, "no session, peer_id=%s", peer_id.c_str());
     }
 
-    // Note that we don't(except error) switch to the context of session, for performance issue.
-    if (is_rtp_or_rtcp && !is_rtcp) {
-        ++_srs_pps_rrtps->sugar;
-
-        err = session->on_rtp(data, size);
-        if (err != srs_success) {
-            session->switch_to_context();
-        }
-        return err;
-    }
-
-    session->switch_to_context();
-    if (is_rtp_or_rtcp && is_rtcp) {
-        ++_srs_pps_rrtcps->sugar;
-
-        return session->on_rtcp(data, size);
-    }
     if (srs_is_dtls((uint8_t*)data, size)) {
-        ++_srs_pps_rstuns->sugar;
-
         return session->on_dtls(data, size);
+    } else if (srs_is_rtp_or_rtcp((uint8_t*)data, size)) {
+        if (srs_is_rtcp((uint8_t*)data, size)) {
+            return session->on_rtcp(data, size);
+        }
+        return session->on_rtp(data, size);
     }
+
     return srs_error_new(ERROR_RTC_UDP, "unknown packet");
 }
 
@@ -576,12 +469,8 @@ srs_error_t SrsRtcServer::do_create_session(
 
     // We allows to mock the eip of server.
     if (!mock_eip.empty()) {
-        string host;
-        int port = _srs_config->get_rtc_server_listen();
-        srs_parse_hostport(mock_eip, host, port);
-
-        local_sdp.add_candidate(host, port, "host");
-        srs_trace("RTC: Use candidate mock_eip %s as %s:%d", mock_eip.c_str(), host.c_str(), port);
+        local_sdp.add_candidate(mock_eip, _srs_config->get_rtc_server_listen(), "host");
+        srs_trace("RTC: Use candidate mock_eip %s", mock_eip.c_str());
     } else {
         std::vector<string> candidate_ips = get_candidate_ips();
         for (int i = 0; i < (int)candidate_ips.size(); ++i) {
@@ -590,23 +479,18 @@ srs_error_t SrsRtcServer::do_create_session(
         srs_trace("RTC: Use candidates %s", srs_join_vector_string(candidate_ips, ", ").c_str());
     }
 
-    // Setup the negotiate DTLS by config.
-    local_sdp.session_negotiate_ = local_sdp.session_config_;
-
-    // Setup the negotiate DTLS role.
     if (remote_sdp.get_dtls_role() == "active") {
-        local_sdp.session_negotiate_.dtls_role = "passive";
+        local_sdp.set_dtls_role("passive");
     } else if (remote_sdp.get_dtls_role() == "passive") {
-        local_sdp.session_negotiate_.dtls_role = "active";
+        local_sdp.set_dtls_role("active");
     } else if (remote_sdp.get_dtls_role() == "actpass") {
-        local_sdp.session_negotiate_.dtls_role = local_sdp.session_config_.dtls_role;
+        local_sdp.set_dtls_role(local_sdp.session_config_.dtls_role);
     } else {
         // @see: https://tools.ietf.org/html/rfc4145#section-4.1
         // The default value of the setup attribute in an offer/answer exchange
         // is 'active' in the offer and 'passive' in the answer.
-        local_sdp.session_negotiate_.dtls_role = "passive";
+        local_sdp.set_dtls_role("passive");
     }
-    local_sdp.set_dtls_role(local_sdp.session_negotiate_.dtls_role);
 
     session->set_remote_sdp(remote_sdp);
     // We must setup the local SDP, then initialize the session object.
@@ -650,12 +534,8 @@ srs_error_t SrsRtcServer::create_session2(SrsRequest* req, SrsSdp& local_sdp, co
 
     // We allows to mock the eip of server.
     if (!mock_eip.empty()) {
-        string host;
-        int port = _srs_config->get_rtc_server_listen();
-        srs_parse_hostport(mock_eip, host, port);
-
-        local_sdp.add_candidate(host, port, "host");
-        srs_trace("RTC: Use candidate mock_eip %s as %s:%d", mock_eip.c_str(), host.c_str(), port);
+        local_sdp.add_candidate(mock_eip, _srs_config->get_rtc_server_listen(), "host");
+        srs_trace("RTC: Use candidate mock_eip %s", mock_eip.c_str());
     } else {
         std::vector<string> candidate_ips = get_candidate_ips();
         for (int i = 0; i < (int)candidate_ips.size(); ++i) {
@@ -694,6 +574,11 @@ srs_error_t SrsRtcServer::setup_session2(SrsRtcConnection* session, SrsRequest* 
     return err;
 }
 
+void SrsRtcServer::insert_into_id_sessions(const string& peer_id, SrsRtcConnection* session)
+{
+    _srs_rtc_manager->add_with_id(peer_id, session);
+}
+
 SrsRtcConnection* SrsRtcServer::find_session_by_username(const std::string& username)
 {
     ISrsResource* conn = _srs_rtc_manager->find_by_name(username);
@@ -710,13 +595,7 @@ srs_error_t SrsRtcServer::notify(int type, srs_utime_t interval, srs_utime_t tic
     // Check all sessions and dispose the dead sessions.
     for (int i = 0; i < (int)_srs_rtc_manager->size(); i++) {
         SrsRtcConnection* session = dynamic_cast<SrsRtcConnection*>(_srs_rtc_manager->at(i));
-        // Ignore not session, or already disposing.
-        if (!session || session->disposing_) {
-            continue;
-        }
-
-        // Update stat if session is alive.
-        if (session->is_alive()) {
+        if (!session || !session->is_alive() || session->disposing_) {
             nn_rtc_conns++;
             continue;
         }
@@ -736,61 +615,13 @@ srs_error_t SrsRtcServer::notify(int type, srs_utime_t interval, srs_utime_t tic
     if (!nn_rtc_conns) {
         return err;
     }
-    static char buf[128];
 
-    string rpkts_desc;
-    _srs_pps_rpkts->update(); _srs_pps_rrtps->update(); _srs_pps_rstuns->update(); _srs_pps_rrtcps->update();
-    if (_srs_pps_rpkts->r10s() || _srs_pps_rrtps->r10s() || _srs_pps_rstuns->r10s() || _srs_pps_rrtcps->r10s()) {
-        snprintf(buf, sizeof(buf), ", rpkts=(%d,rtp:%d,stun:%d,rtcp:%d)", _srs_pps_rpkts->r10s(), _srs_pps_rrtps->r10s(), _srs_pps_rstuns->r10s(), _srs_pps_rrtcps->r10s());
-        rpkts_desc = buf;
-    }
-
-    string spkts_desc;
-    _srs_pps_spkts->update(); _srs_pps_srtps->update(); _srs_pps_sstuns->update(); _srs_pps_srtcps->update();
-    if (_srs_pps_spkts->r10s() || _srs_pps_srtps->r10s() || _srs_pps_sstuns->r10s() || _srs_pps_srtcps->r10s()) {
-        snprintf(buf, sizeof(buf), ", spkts=(%d,rtp:%d,stun:%d,rtcp:%d)", _srs_pps_spkts->r10s(), _srs_pps_srtps->r10s(), _srs_pps_sstuns->r10s(), _srs_pps_srtcps->r10s());
-        spkts_desc = buf;
-    }
-
-    string rtcp_desc;
-    _srs_pps_pli->update(); _srs_pps_twcc->update(); _srs_pps_rr->update();
-    if (_srs_pps_pli->r10s() || _srs_pps_twcc->r10s() || _srs_pps_rr->r10s()) {
-        snprintf(buf, sizeof(buf), ", rtcp=(pli:%d,twcc:%d,rr:%d)", _srs_pps_pli->r10s(), _srs_pps_twcc->r10s(), _srs_pps_rr->r10s());
-        rtcp_desc = buf;
-    }
-
-    string snk_desc;
-    _srs_pps_snack->update(); _srs_pps_snack2->update(); _srs_pps_sanack->update(); _srs_pps_svnack->update();
-    if (_srs_pps_snack->r10s() || _srs_pps_sanack->r10s() || _srs_pps_svnack->r10s() || _srs_pps_snack2->r10s()) {
-        snprintf(buf, sizeof(buf), ", snk=(%d,a:%d,v:%d,h:%d)", _srs_pps_snack->r10s(), _srs_pps_sanack->r10s(), _srs_pps_svnack->r10s(), _srs_pps_snack2->r10s());
-        snk_desc = buf;
-    }
-
-    string rnk_desc;
-    _srs_pps_rnack->update(); _srs_pps_rnack2->update(); _srs_pps_rhnack->update(); _srs_pps_rmnack->update();
-    if (_srs_pps_rnack->r10s() || _srs_pps_rnack2->r10s() || _srs_pps_rhnack->r10s() || _srs_pps_rmnack->r10s()) {
-        snprintf(buf, sizeof(buf), ", rnk=(%d,%d,h:%d,m:%d)", _srs_pps_rnack->r10s(), _srs_pps_rnack2->r10s(), _srs_pps_rhnack->r10s(), _srs_pps_rmnack->r10s());
-        rnk_desc = buf;
-    }
-
-    string loss_desc;
-    SrsSnmpUdpStat* s = srs_get_udp_snmp_stat();
-    if (s->rcv_buf_errors_delta || s->snd_buf_errors_delta) {
-        snprintf(buf, sizeof(buf), ", loss=(r:%d,s:%d)", s->rcv_buf_errors_delta, s->snd_buf_errors_delta);
-        loss_desc = buf;
-    }
-
-    string fid_desc;
-    _srs_pps_ids->update(); _srs_pps_fids->update(); _srs_pps_fids_level0->update(); _srs_pps_addrs->update(); _srs_pps_fast_addrs->update();
-    if (_srs_pps_ids->r10s(), _srs_pps_fids->r10s(), _srs_pps_fids_level0->r10s(), _srs_pps_addrs->r10s(), _srs_pps_fast_addrs->r10s()) {
-        snprintf(buf, sizeof(buf), ", fid=(id:%d,fid:%d,ffid:%d,addr:%d,faddr:%d)", _srs_pps_ids->r10s(), _srs_pps_fids->r10s(), _srs_pps_fids_level0->r10s(), _srs_pps_addrs->r10s(), _srs_pps_fast_addrs->r10s());
-        fid_desc = buf;
-    }
-
-    srs_trace("RTC: Server conns=%u%s%s%s%s%s%s%s",
-        nn_rtc_conns,
-        rpkts_desc.c_str(), spkts_desc.c_str(), rtcp_desc.c_str(), snk_desc.c_str(), rnk_desc.c_str(), loss_desc.c_str(), fid_desc.c_str()
-    );
+    // Show statistics for RTC server.
+    SrsProcSelfStat* u = srs_get_self_proc_stat();
+    // Resident Set Size: number of pages the process has in real memory.
+    int memory = (int)(u->rss * 4 / 1024);
+    // TODO: FIXME: Show more data for RTC server.
+    srs_trace("RTC: Server conns=%u, cpu=%.2f%%, rss=%dMB", nn_rtc_conns, u->percent * 100, memory);
 
     return err;
 }

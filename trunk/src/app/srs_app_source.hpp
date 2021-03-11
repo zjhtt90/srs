@@ -34,7 +34,6 @@
 #include <srs_app_reload.hpp>
 #include <srs_core_performance.hpp>
 #include <srs_service_st.hpp>
-#include <srs_app_hourglass.hpp>
 
 class SrsFormat;
 class SrsRtmpFormat;
@@ -451,17 +450,15 @@ public:
 };
 
 // The source manager to create and refresh all stream sources.
-class SrsSourceManager : public ISrsHourGlass
+class SrsSourceManager
 {
 private:
     srs_mutex_t lock;
     std::map<std::string, SrsSource*> pool;
-    SrsHourGlass* timer_;
 public:
     SrsSourceManager();
     virtual ~SrsSourceManager();
 public:
-    virtual srs_error_t initialize();
     //  create source when fetch from cache failed.
     // @param r the client request.
     // @param h the event handler for source.
@@ -474,10 +471,9 @@ private:
 public:
     // dispose and cycle all sources.
     virtual void dispose();
-// interface ISrsHourGlass
+    virtual srs_error_t cycle();
 private:
-    virtual srs_error_t setup_ticks();
-    virtual srs_error_t notify(int event, srs_utime_t interval, srs_utime_t tick);
+    virtual srs_error_t do_cycle();
 public:
     // when system exit, destroy th`e sources,
     // For gmc to analysis mem leaks.

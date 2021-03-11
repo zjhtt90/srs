@@ -87,54 +87,9 @@ const SrsContextId& SrsDummyCoroutine::cid()
     return _srs_context->get_id();
 }
 
-SrsSTCoroutine::SrsSTCoroutine(string n, ISrsCoroutineHandler* h)
-{
-    impl_ = new SrsFastCoroutine(n, h);
-}
-
-SrsSTCoroutine::SrsSTCoroutine(string n, ISrsCoroutineHandler* h, SrsContextId cid)
-{
-    impl_ = new SrsFastCoroutine(n, h, cid);
-}
-
-SrsSTCoroutine::~SrsSTCoroutine()
-{
-    srs_freep(impl_);
-}
-
-void SrsSTCoroutine::set_stack_size(int v)
-{
-    impl_->set_stack_size(v);
-}
-
-srs_error_t SrsSTCoroutine::start()
-{
-    return impl_->start();
-}
-
-void SrsSTCoroutine::stop()
-{
-    impl_->stop();
-}
-
-void SrsSTCoroutine::interrupt()
-{
-    impl_->interrupt();
-}
-
-srs_error_t SrsSTCoroutine::pull()
-{
-    return impl_->pull();
-}
-
-const SrsContextId& SrsSTCoroutine::cid()
-{
-    return impl_->cid();
-}
-
 _ST_THREAD_CREATE_PFN _pfn_st_thread_create = (_ST_THREAD_CREATE_PFN)st_thread_create;
 
-SrsFastCoroutine::SrsFastCoroutine(string n, ISrsCoroutineHandler* h)
+SrsSTCoroutine::SrsSTCoroutine(string n, ISrsCoroutineHandler* h)
 {
     // TODO: FIXME: Reduce duplicated code.
     name = n;
@@ -147,7 +102,7 @@ SrsFastCoroutine::SrsFastCoroutine(string n, ISrsCoroutineHandler* h)
     stack_size = 0;
 }
 
-SrsFastCoroutine::SrsFastCoroutine(string n, ISrsCoroutineHandler* h, SrsContextId cid)
+SrsSTCoroutine::SrsSTCoroutine(string n, ISrsCoroutineHandler* h, SrsContextId cid)
 {
     name = n;
     handler = h;
@@ -160,21 +115,19 @@ SrsFastCoroutine::SrsFastCoroutine(string n, ISrsCoroutineHandler* h, SrsContext
     stack_size = 0;
 }
 
-SrsFastCoroutine::~SrsFastCoroutine()
+SrsSTCoroutine::~SrsSTCoroutine()
 {
     stop();
-
-    // TODO: FIXME: We must assert the cycle is done.
     
     srs_freep(trd_err);
 }
 
-void SrsFastCoroutine::set_stack_size(int v)
+void SrsSTCoroutine::set_stack_size(int v)
 {
     stack_size = v;
 }
 
-srs_error_t SrsFastCoroutine::start()
+srs_error_t SrsSTCoroutine::start()
 {
     srs_error_t err = srs_success;
     
@@ -206,7 +159,7 @@ srs_error_t SrsFastCoroutine::start()
     return err;
 }
 
-void SrsFastCoroutine::stop()
+void SrsSTCoroutine::stop()
 {
     if (disposed) {
         return;
@@ -215,7 +168,7 @@ void SrsFastCoroutine::stop()
     
     interrupt();
 
-    // When not started, the trd is NULL.
+    // When not started, the rd is NULL.
     if (trd) {
         void* res = NULL;
         int r0 = st_thread_join((st_thread_t)trd, &res);
@@ -237,7 +190,7 @@ void SrsFastCoroutine::stop()
     return;
 }
 
-void SrsFastCoroutine::interrupt()
+void SrsSTCoroutine::interrupt()
 {
     if (!started || interrupted || cycle_done) {
         return;
@@ -247,18 +200,21 @@ void SrsFastCoroutine::interrupt()
     if (trd_err == srs_success) {
         trd_err = srs_error_new(ERROR_THREAD_INTERRUPED, "interrupted");
     }
-
-    // Note that if another thread is stopping thread and waiting in st_thread_join,
-    // the interrupt will make the st_thread_join fail.
+    
     st_thread_interrupt((st_thread_t)trd);
 }
 
-const SrsContextId& SrsFastCoroutine::cid()
+srs_error_t SrsSTCoroutine::pull()
+{
+    return srs_error_copy(trd_err);
+}
+
+const SrsContextId& SrsSTCoroutine::cid()
 {
     return cid_;
 }
 
-srs_error_t SrsFastCoroutine::cycle()
+srs_error_t SrsSTCoroutine::cycle()
 {
     if (_srs_context) {
         if (cid_.empty()) {
@@ -278,9 +234,9 @@ srs_error_t SrsFastCoroutine::cycle()
     return err;
 }
 
-void* SrsFastCoroutine::pfn(void* arg)
+void* SrsSTCoroutine::pfn(void* arg)
 {
-    SrsFastCoroutine* p = (SrsFastCoroutine*)arg;
+    SrsSTCoroutine* p = (SrsSTCoroutine*)arg;
 
     srs_error_t err = p->cycle();
 

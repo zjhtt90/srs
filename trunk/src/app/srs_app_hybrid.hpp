@@ -28,8 +28,6 @@
 
 #include <vector>
 
-#include <srs_app_hourglass.hpp>
-
 class SrsServer;
 
 // The hibrid server interfaces, we could register many servers.
@@ -64,11 +62,10 @@ public:
 };
 
 // The hybrid server manager.
-class SrsHybridServer : public ISrsHourGlass
+class SrsHybridServer
 {
 private:
     std::vector<ISrsHybridServer*> servers;
-    SrsHourGlass* timer_;
 public:
     SrsHybridServer();
     virtual ~SrsHybridServer();
@@ -80,10 +77,6 @@ public:
     virtual void stop();
 public:
     virtual SrsServerAdapter* srs();
-// interface ISrsHourGlass
-private:
-    virtual srs_error_t setup_ticks();
-    virtual srs_error_t notify(int event, srs_utime_t interval, srs_utime_t tick);
 };
 
 extern SrsHybridServer* _srs_hybrid;
